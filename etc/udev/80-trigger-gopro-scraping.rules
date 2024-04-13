@@ -1,0 +1,1 @@
+SUBSYSTEM=="usb", ATTR{ID_VENDOR_ID}=="2672", ATTR{ID_MODEL_ID}=="004b", ACTION=="add", RUN+="/bin/bash -c /home/matt/Projects/GoProScraping/scripts/test.bash"
