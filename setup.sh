@@ -25,3 +25,25 @@ done
 udevadm control --reload
 udevadm trigger
 echo "Finished copying UDEV rules"
+
+
+echo "Copying fstab setup"
+added_setup_block=0
+while read line; 
+do 
+	  set +e
+		line_exists=$(/bin/egrep -c "$line" /etc/fstab)
+	  set -e
+    if (( line_exists == 0 )); then
+       if (( added_setup_block == 0 )); then
+					 echo "" >> /etc/fstab
+           echo "#### Added by setup script at $(date +"%Y/%m/%d %H:%M:%S")" >> /etc/fstab
+					 added_setup_block=1
+       fi
+	     echo $line >> /etc/fstab
+    fi
+done < etc/fstab
+if (( added_setup_block == 1 )); then
+ 	 echo "##############" >> /etc/fstab
+fi
+echo "Finished copying fstab setup"
