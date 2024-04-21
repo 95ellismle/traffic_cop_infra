@@ -1,1 +1,1 @@
-SUBSYSTEM=="usb", ATTR{ID_VENDOR_ID}=="2672", ATTR{ID_MODEL_ID}=="004b", ACTION=="add", RUN+="/bin/bash -c /home/matt/Projects/GoProScraping/scripts/test.bash"
+SUBSYSTEM=="usb", ATTR{idVendor}=="2672", ATTR{idProduct}=="004b", ACTION=="add", RUN+="/bin/bash -c /home/matt/Projects/GoProScraping/scripts/grab_go_pro_files.sh"

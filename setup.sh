@@ -4,8 +4,24 @@ if [[ "$(whoami)" != "root" ]]; then
 fi
 
 
-GIT_ROOT=$()
+GIT_ROOT=$(git rev-parse --show-toplevel)
+MY_UDEV_DIR="$GIT_ROOT/etc/udev"
+UDEV_SYS_DIR="/etc/udev/rules.d"
+LOG_DIR="/home/matt/log"
 
-udev_rule="/etc/udev/rules.d/"
-for rule_file in 
-if [[ ! -f 
+mkdir -p $LOG_DIR
+
+
+echo "Copying UDEV rules"
+for rule_file in $MY_UDEV_DIR/*.rules; do
+  rule_filename=$(basename $rule_file)
+	new_filepath="$UDEV_SYS_DIR/$rule_filename"
+	#if [[ ! -f $new_filepath ]]; then
+		echo "  Copying: $rule_file -> $new_filepath"
+		cp $rule_file $new_filepath
+		chmod 644 $new_filepath
+	#fi
+done
+udevadm control --reload
+udevadm trigger
+echo "Finished copying UDEV rules"
