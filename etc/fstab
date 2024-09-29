@@ -1,2 +1,2 @@
 # External HDD
-UUID=BE6F-C0DE /media/HDD2 ext4 defaults, 0 0
+/dev/sdb1 /media/HDD1 exfat defaults,nofail,x-systemd.device-timeout=4 0 0

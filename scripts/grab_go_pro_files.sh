@@ -11,8 +11,9 @@ log_info () {
 
 log_info "Starting GoPro file transfer"
 
-GOPRO_OUT_DIR="/media/HDD2/GoPro"
-GOPRO_TRANS_DIR="/media/HDD2/GoPro/Transfers"
+GOPRO_MOUNT_DIR="/media/GoPro"
+GOPRO_OUT_DIR="/media/HDD1/GoPro"
+GOPRO_TRANS_DIR="/media/HDD1/GoPro/Transfers"
 
 
 # Must be root for mtp to detect anything
@@ -21,72 +22,67 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Check the GoPro is plugged in
-for i in 1 2 3;
-do
-	check=$((mtp-detect 2>/dev/null) | grep -c "GoPro")
-	log_info "Checking mtp-detect for GoPro"
-	if (( check < 1 )); then
-	   if $(( i == 3 )); then
-			 log_err "Couldn't detect GoPro -exitting."
-			 exit 1
-		 fi
-	else
-		 log_info "GoPro detected"
-     break
-	fi
-  sleep 2
-done
 
 # Check the GoPro out dir exists
 if [[ ! -d "$GOPRO_OUT_DIR" ]]; then
    log_err "GoPro output directory not found at: '$GOPRO_OUT_DIR'"
    exit 1
 fi
-if [[ ! -d "GOPRO_TRANS_DIR" ]]; then
-   mkdir -p "$GOPRO_TRANS_DIR"
+if [[ ! -d "$GOPRO_TRANS_DIR" ]]; then
+   mkdir "$GOPRO_TRANS_DIR"
    log_info "Created directory at: $GOPRO_TRANS_DIR"
 fi
 
-# Now grab the files
-sleep 1
-device_id=$(mtp-detect 2>&1 | grep "Device [0-9]*" -oh | grep "[0-9]*" -oh)
-log_info "Device: $device_id"
 
-sleep 1  # mtp needs to sleep for a bit between calls
-files="$(/usr/bin/mtp-files | grep "GS.*\.360" -B1 -A3)"
-files=$(/usr/bin/python3 -c "print('''$files'''.replace('\n', ''))")
-
-IFS='--'
-for file in $files;
+# Get Device ID and make sure the GoPro is connected -try 5 times. If not successful then fall over afterwards.
+for i in $(seq 5);
 do
-   filename=$(echo $file | grep "GS.*\.360" -oh)
-	 if [[ -z $filename ]]; then continue; fi
-	 file_id=$(echo $file | grep "File ID: [0-9]+" -Poh | grep "[0-9]+" -Poh)
-	 log_info "Filename: $filename"
-	 log_info "FileID: $file_id"
-
-	 filepath="$GOPRO_TRANS_DIR/$filename"
-	 filestem="$(echo $filename | cut -d'.' -f1)"
-
-	 # Transfer the file
-   if [[ ! -f $filepath ]] && [[ ! $(ls $GOPRO_TRANS_DIR/$filestem*.360 2>/dev/null) ]]; then
-			 sleep 1
-		   mtp-getfile $device_id $file_id $filepath
-   else
-		   log_info "Already processed: $filepath"
-   fi
-
-	 # Add the created date
-	 if [[ -f "$filepath" ]]; then
-			 create_date=$(exiftool -s -time:CreateDate $filepath | awk '{print $3"_"$4}' | sed s/":"/""/g)
-			 new_filepath="$GOPRO_TRANS_DIR/${filestem}_${create_date}.360"
-       if [[ ! -f "$new_filepath" ]]; then
-				 log_info "File moved from $filepath -> $new_filepath"
-				 mv $filepath $new_filepath
-       else
-				 log_err "Not moving $filepath, $new_filepath already exists"
-       fi
-   fi
+    check=$(jmtpfs --listDevices 2>&1 | grep "VID=2672" | grep "PID=004b")
+    if [[ -z $check ]]; then
+        log_info "Can't find GoPro device -sleeping for 5 seconds and trying again"
+        continue
+    else
+        details=$(lsusb -v | grep "GoPro MAX" | grep "Bus.*?:" -Poh)
+        bus_num=$(echo $details | cut -d' ' -f 2)
+        device_num=$(echo $details | cut -d' ' -f 4 | cut -d':' -f 1)
+        log_info "Found device, ID='$device_num', BusNum=$bus_num"
+        break
+    fi
+    sleep 5
 done
+if [[ -z $device_num ]]; then
+    log_err "Couldn't find the GoPro plugged in -something went wrong."
+fi
 
+# Now mount the MTP device
+sleep 1
+if [[ ! -d $GOPRO_MOUNT_DIR ]]; then
+    log_info "Creating dir at: '$GOPRO_MOUNT_DIR'"
+    mkdir $GOPRO_MOUNT_DIR
+fi
+if (( $(ls /media/GoPro | wc -l ) == 0 )); then
+    log_info "Attempting device mounting"
+    jmtpfs /media/GoPro/ -device=$bus_num,$device_num 2> /dev/null
+else
+    log_info "Drive already mounted, skipping"
+fi
+
+
+# Now transfer files from mount point to directory on the HDD
+for mnt_filepath in "$GOPRO_MOUNT_DIR/GoPro MTP Client Disk Volume/DCIM/100GOPRO"/GS*.360;
+do
+    # Get the filename and new filename with date
+    log_info "Acting on mount filepath: $mnt_filepath"
+    mnt_filename=$(basename "$mnt_filepath")
+    log_info "Mount filestem: $mnt_filename, new_filename: $mnt_filename"
+
+    # Copy the file across
+		new_filepath="$GOPRO_TRANS_DIR/$mnt_filename"
+    if [[ -f "$new_filepath" ]]; then
+        log_info "Skipping $new_filepath, as it already exists"
+        continue
+    fi
+    log_info "Copying $mnt_filepath to $new_filepath"
+    cp "$mnt_filepath" "$new_filepath"
+    log_info "$new_filepath copied"
+done
