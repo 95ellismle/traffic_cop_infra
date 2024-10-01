@@ -1,1 +1,0 @@
-SUBSYSTEM=="usb", ATTR{capability}=="mtp", ATTR{idVendor}=="2672", ATTR{idProduct}=="004b", ACTION=="add", RUN+="/bin/bash -c /home/matt/Projects/GoProScraping/scripts/grab_go_pro_files.sh"

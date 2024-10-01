@@ -17,14 +17,20 @@ for rule_file in $MY_UDEV_DIR/*.rules; do
   rule_filename=$(basename $rule_file)
 	new_filepath="$UDEV_SYS_DIR/$rule_filename"
 	#if [[ ! -f $new_filepath ]]; then
-		echo "  Copying: $rule_file -> $new_filepath"
-		cp $rule_file $new_filepath
-		chmod 644 $new_filepath
+	echo "  Copying: $rule_file -> $new_filepath"
+	cp $rule_file $new_filepath
+	chmod 644 $new_filepath
 	#fi
 done
 udevadm control --reload
 udevadm trigger
 echo "Finished copying UDEV rules"
+
+
+echo "Copying systemd services"
+cp ./etc/systemd/system/* /etc/systemd/system/
+systemctl daemon-reload
+echo "Finished systemd copying"
 
 
 echo "Copying fstab setup"
